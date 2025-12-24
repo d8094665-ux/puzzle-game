@@ -1,118 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>Собери квартиру</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      display: flex;
-      justify-content: center;
-    }
-
-    .app {
-      width: 100%;
-      max-width: 420px;
-      padding: 16px;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 22px;
-      margin-bottom: 10px;
-    }
-
-    button {
-      padding: 14px;
-      width: 100%;
-      border: none;
-      border-radius: 10px;
-      background: #2f80ed;
-      color: #fff;
-      font-size: 16px;
-      margin-top: 12px;
-    }
-
-    .hidden { display: none; }
-
-    input[type="file"] {
-      margin-top: 12px;
-    }
-
-    .puzzle {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2px;
-      margin-top: 15px;
-      position: relative;
-    }
-
-    .piece {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      background-size: 300% 300%;
-      border-radius: 4px;
-      touch-action: none;
-      cursor: grab;
-    }
-
-    .piece.dragging {
-      position: absolute;
-      z-index: 10;
-      cursor: grabbing;
-      opacity: 0.9;
-      transform: scale(1.05);
-    }
-
-    .success {
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-    }
-
-    .promo {
-      font-size: 20px;
-      color: #27ae60;
-      font-weight: bold;
-      margin: 10px 0;
-    }
-  </style>
-</head>
-
-<body>
-<div class="app">
-
-  <!-- START -->
-  <div id="startScreen">
-    <h1>🧩 Собери квартиру</h1>
-    <p>Загрузи фото апартаментов и собери пазл</p>
-    <input type="file" id="imageInput" accept="image/*">
-    <button id="startBtn" disabled>Начать игру</button>
-  </div>
-
-  <!-- GAME -->
-  <div id="gameScreen" class="hidden">
-    <h1>Перетащи элементы</h1>
-    <div class="puzzle" id="puzzle"></div>
-  </div>
-
-  <!-- SUCCESS -->
-  <div id="successScreen" class="hidden">
-    <div class="success">
-      <h1>🎉 Готово!</h1>
-      <p>Ты получаешь:</p>
-      <div class="promo">Скидка 5%</div>
-      <p>Промокод: <b>MOSCOW5</b></p>
-      <button onclick="goToBooking()">Забронировать</button>
-    </div>
-  </div>
-
-</div>
-
 <script>
 if (window.Telegram?.WebApp) {
   Telegram.WebApp.ready();
@@ -127,9 +12,8 @@ const startScreen = document.getElementById('startScreen');
 const gameScreen = document.getElementById('gameScreen');
 const successScreen = document.getElementById('successScreen');
 
-let draggedPiece = null;
-let startX = 0;
-let startY = 0;
+let pieces = [];
+let draggedIndex = null;
 
 imageInput.onchange = () => startBtn.disabled = !imageInput.files.length;
 
@@ -145,83 +29,76 @@ function initPuzzle() {
 
   img.onload = () => {
     puzzleEl.innerHTML = '';
-    const order = [...Array(9).keys()];
-    shuffle(order);
+    pieces = [...Array(9).keys()];
+    shuffle(pieces);
 
-    order.forEach((pos, index) => {
+    pieces.forEach((pos, index) => {
       const piece = document.createElement('div');
       piece.className = 'piece';
-      piece.dataset.correct = index;
+      piece.dataset.index = index;
       piece.dataset.current = pos;
 
-      const x = pos % 3;
-      const y = Math.floor(pos / 3);
+      updateBG(piece);
 
-      piece.style.backgroundImage = `url(${img.src})`;
-      piece.style.backgroundPosition = `${x * 50}% ${y * 50}%`;
+      piece.addEventListener('pointerdown', e => {
+        draggedIndex = Number(piece.dataset.index);
+        piece.style.opacity = '0.6';
+      });
 
-      piece.addEventListener('pointerdown', onDragStart);
+      piece.addEventListener('pointerup', e => {
+        const targetIndex = getIndexFromEvent(e);
+        piece.style.opacity = '1';
+
+        if (targetIndex !== null && targetIndex !== draggedIndex) {
+          swapPieces(draggedIndex, targetIndex);
+          renderPuzzle();
+
+          if (checkWin()) setTimeout(showSuccess, 300);
+        }
+
+        draggedIndex = null;
+      });
+
       puzzleEl.appendChild(piece);
     });
   };
 }
 
-function onDragStart(e) {
-  draggedPiece = e.target;
-  draggedPiece.setPointerCapture(e.pointerId);
+function getIndexFromEvent(e) {
+  const rect = puzzleEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
-  const rect = draggedPiece.getBoundingClientRect();
-  startX = e.clientX - rect.left;
-  startY = e.clientY - rect.top;
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
 
-  draggedPiece.classList.add('dragging');
-  draggedPiece.style.width = rect.width + 'px';
-  draggedPiece.style.height = rect.height + 'px';
+  const col = Math.floor(x / (rect.width / 3));
+  const row = Math.floor(y / (rect.height / 3));
+
+  return row * 3 + col;
 }
 
-document.addEventListener('pointermove', e => {
-  if (!draggedPiece) return;
+function swapPieces(a, b) {
+  [pieces[a], pieces[b]] = [pieces[b], pieces[a]];
+}
 
-  draggedPiece.style.left = (e.clientX - startX - puzzleEl.getBoundingClientRect().left) + 'px';
-  draggedPiece.style.top = (e.clientY - startY - puzzleEl.getBoundingClientRect().top) + 'px';
-});
-
-document.addEventListener('pointerup', e => {
-  if (!draggedPiece) return;
-
-  draggedPiece.classList.remove('dragging');
-  draggedPiece.style.left = '';
-  draggedPiece.style.top = '';
-  draggedPiece.style.width = '';
-  draggedPiece.style.height = '';
-
-  const target = document.elementFromPoint(e.clientX, e.clientY);
-  if (target && target.classList.contains('piece') && target !== draggedPiece) {
-    swap(draggedPiece, target);
-    if (checkWin()) setTimeout(showSuccess, 300);
-  }
-
-  draggedPiece = null;
-});
-
-function swap(a, b) {
-  const temp = a.dataset.current;
-  a.dataset.current = b.dataset.current;
-  b.dataset.current = temp;
-
-  updateBG(a);
-  updateBG(b);
+function renderPuzzle() {
+  [...puzzleEl.children].forEach((piece, index) => {
+    piece.dataset.index = index;
+    piece.dataset.current = pieces[index];
+    updateBG(piece);
+  });
 }
 
 function updateBG(piece) {
   const pos = piece.dataset.current;
+  piece.style.backgroundImage = `url(${URL.createObjectURL(imageInput.files[0])})`;
+  piece.style.backgroundSize = '300% 300%';
   piece.style.backgroundPosition =
     `${(pos % 3) * 50}% ${Math.floor(pos / 3) * 50}%`;
 }
 
 function checkWin() {
-  return [...document.querySelectorAll('.piece')]
-    .every(p => p.dataset.correct === p.dataset.current);
+  return pieces.every((v, i) => v === i);
 }
 
 function showSuccess() {
@@ -240,5 +117,3 @@ function goToBooking() {
   window.location.href = 'https://example.com';
 }
 </script>
-</body>
-</html>
