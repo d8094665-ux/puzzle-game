@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Собери квартиру</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 420px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 14px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #2f80ed;
+      color: #fff;
+      cursor: pointer;
+      margin-top: 12px;
+      width: 100%;
+    }
+
+    button:disabled {
+      background: #aaa;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    input[type="file"] {
+      margin-top: 12px;
+    }
+
+    .puzzle {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      margin-top: 15px;
+    }
+
+    .piece {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-size: 300% 300%;
+      cursor: pointer;
+    }
+
+    .success {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .promo {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 10px 0;
+      color: #27ae60;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- START SCREEN -->
+    <div id="startScreen">
+      <h1>🧩 Собери квартиру</h1>
+      <p>Загрузи фото апартаментов и собери пазл, чтобы получить бонус</p>
+
+      <!-- Загрузка фото квартиры -->
+      <input type="file" id="imageInput" accept="image/*" />
+
+      <button id="startBtn" disabled>Начать игру</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="gameScreen" class="hidden">
+      <h1>Собери изображение</h1>
+      <div class="puzzle" id="puzzle"></div>
+    </div>
+
+    <!-- SUCCESS SCREEN -->
+    <div id="successScreen" class="hidden">
+      <div class="success">
+        <h1>🎉 Готово!</h1>
+        <p>Ты собрал квартиру и получаешь:</p>
+        <div class="promo">Скидка 5%</div>
+        <p>Промокод: <b>MOSCOW5</b></p>
+
+        <button onclick="goToBooking()">Забронировать квартиру</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Telegram Mini App init
+    if (window.Telegram && Telegram.WebApp) {
+      Telegram.WebApp.ready();
+      Telegram.WebApp.expand();
+    }
+
+    const imageInput = document.getElementById("imageInput");
+    const startBtn = document.getElementById("startBtn");
+    const puzzleEl = document.getElementById("puzzle");
+
+    const startScreen = document.getElementById("startScreen");
+    const gameScreen = document.getElementById("gameScreen");
+    const successScreen = document.getElementById("successScreen");
+
+    let pieces = [];
+    let selected = null;
+
+    imageInput.addEventListener("change", () => {
+      startBtn.disabled = !imageInput.files.length;
+    });
+
+    startBtn.addEventListener("click", () => {
+      startScreen.classList.add("hidden");
+      gameScreen.classList.remove("hidden");
+      createPuzzle();
+    });
+
+    function createPuzzle() {
+      const img = new Image();
+      img.src = URL.createObjectURL(imageInput.files[0]);
+
+      img.onload = () => {
+        pieces = [];
+        puzzleEl.innerHTML = "";
+
+        for (let i = 0; i < 9; i++) {
+          pieces.push(i);
+        }
+
+        shuffleArray(pieces);
+
+        pieces.forEach((pos, index) => {
+          const div = document.createElement("div");
+          div.className = "piece";
+          div.dataset.correct = index;
+          div.dataset.current = pos;
+
+          const x = pos % 3;
+          const y = Math.floor(pos / 3);
+
+          div.style.backgroundImage = `url(${img.src})`;
+          div.style.backgroundPosition = `${x * 50}% ${y * 50}%`;
+
+          div.addEventListener("click", () => selectPiece(div));
+          puzzleEl.appendChild(div);
+        });
+      };
+    }
+
+    function selectPiece(piece) {
+      if (!selected) {
+        selected = piece;
+        piece.style.opacity = "0.6";
+      } else {
+        swapPieces(selected, piece);
+        selected.style.opacity = "1";
+        selected = null;
+
+        if (checkWin()) {
+          setTimeout(showSuccess, 300);
+        }
+      }
+    }
+
+    function swapPieces(a, b) {
+      const temp = a.dataset.current;
+      a.dataset.current = b.dataset.current;
+      b.dataset.current = temp;
+
+      const ax = a.dataset.current % 3;
+      const ay = Math.floor(a.dataset.current / 3);
+      const bx = b.dataset.current % 3;
+      const by = Math.floor(b.dataset.current / 3);
+
+      a.style.backgroundPosition = `${ax * 50}% ${ay * 50}%`;
+      b.style.backgroundPosition = `${bx * 50}% ${by * 50}%`;
+    }
+
+    function checkWin() {
+      return [...document.querySelectorAll(".piece")]
+        .every(p => p.dataset.correct === p.dataset.current);
+    }
+
+    function showSuccess() {
+      gameScreen.classList.add("hidden");
+      successScreen.classList.remove("hidden");
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    function goToBooking() {
+      // Заменить на реальную страницу бронирования
+      window.location.href = "https://example.com";
+    }
+  </script>
+</body>
+</html>
