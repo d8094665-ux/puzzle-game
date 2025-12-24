@@ -1,119 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Собери квартиру</title>
+
+<style>
+body {
+  margin: 0;
+  padding: 16px;
+  background: #1f1f1f;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  text-align: center;
+  font-size: 20px;
+}
+
+#board {
+  max-width: 360px;
+  margin: 20px auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cell {
+  aspect-ratio: 1 / 1;
+  background: #2b2b2b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.piece {
+  width: 100%;
+  height: 100%;
+  background-size: 300% 300%;
+  cursor: grab;
+}
+
+#bonus {
+  display: none;
+  text-align: center;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.back-btn {
+  background: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🧩 Собери квартиру — получи бонус</h1>
+
+<div id="board"></div>
+
+<div id="bonus">
+  <h2>🎉 Отлично!</h2>
+  <p>Вы собрали квартиру и получили бонус</p>
+  <button class="back-btn" id="backToCatalog">
+    🏠 Вернуться к квартирам
+  </button>
+</div>
+
 <script>
-if (window.Telegram?.WebApp) {
-  Telegram.WebApp.ready();
-  Telegram.WebApp.expand();
-}
+const images = [
+  "images/apt1.jpg",
+  "images/apt2.jpg"
+];
 
-const imageInput = document.getElementById('imageInput');
-const startBtn = document.getElementById('startBtn');
-const puzzleEl = document.getElementById('puzzle');
+const size = 3;
+const board = document.getElementById("board");
+const bonus = document.getElementById("bonus");
 
-const startScreen = document.getElementById('startScreen');
-const gameScreen = document.getElementById('gameScreen');
-const successScreen = document.getElementById('successScreen');
+const image = images[Math.floor(Math.random() * images.length)];
+let draggedPiece = null;
 
-let pieces = [];
-let draggedIndex = null;
+// массив правильных позиций
+let positions = [...Array(size * size).keys()];
+positions.sort(() => Math.random() - 0.5);
 
-imageInput.onchange = () => startBtn.disabled = !imageInput.files.length;
+// создаём поле
+positions.forEach((correctPos, cellIndex) => {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.dataset.index = cellIndex;
 
-startBtn.onclick = () => {
-  startScreen.classList.add('hidden');
-  gameScreen.classList.remove('hidden');
-  initPuzzle();
-};
+  const piece = document.createElement("div");
+  piece.className = "piece";
+  piece.draggable = true;
 
-function initPuzzle() {
-  const img = new Image();
-  img.src = URL.createObjectURL(imageInput.files[0]);
+  piece.dataset.correct = correctPos;
 
-  img.onload = () => {
-    puzzleEl.innerHTML = '';
-    pieces = [...Array(9).keys()];
-    shuffle(pieces);
+  const x = correctPos % size;
+  const y = Math.floor(correctPos / size);
 
-    pieces.forEach((pos, index) => {
-      const piece = document.createElement('div');
-      piece.className = 'piece';
-      piece.dataset.index = index;
-      piece.dataset.current = pos;
+  piece.style.backgroundImage = `url(${image})`;
+  piece.style.backgroundPosition = `${x * -100}% ${y * -100}%`;
 
-      updateBG(piece);
-
-      piece.addEventListener('pointerdown', e => {
-        draggedIndex = Number(piece.dataset.index);
-        piece.style.opacity = '0.6';
-      });
-
-      piece.addEventListener('pointerup', e => {
-        const targetIndex = getIndexFromEvent(e);
-        piece.style.opacity = '1';
-
-        if (targetIndex !== null && targetIndex !== draggedIndex) {
-          swapPieces(draggedIndex, targetIndex);
-          renderPuzzle();
-
-          if (checkWin()) setTimeout(showSuccess, 300);
-        }
-
-        draggedIndex = null;
-      });
-
-      puzzleEl.appendChild(piece);
-    });
-  };
-}
-
-function getIndexFromEvent(e) {
-  const rect = puzzleEl.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
-
-  const col = Math.floor(x / (rect.width / 3));
-  const row = Math.floor(y / (rect.height / 3));
-
-  return row * 3 + col;
-}
-
-function swapPieces(a, b) {
-  [pieces[a], pieces[b]] = [pieces[b], pieces[a]];
-}
-
-function renderPuzzle() {
-  [...puzzleEl.children].forEach((piece, index) => {
-    piece.dataset.index = index;
-    piece.dataset.current = pieces[index];
-    updateBG(piece);
+  piece.addEventListener("dragstart", () => {
+    draggedPiece = piece;
   });
-}
 
-function updateBG(piece) {
-  const pos = piece.dataset.current;
-  piece.style.backgroundImage = `url(${URL.createObjectURL(imageInput.files[0])})`;
-  piece.style.backgroundSize = '300% 300%';
-  piece.style.backgroundPosition =
-    `${(pos % 3) * 50}% ${Math.floor(pos / 3) * 50}%`;
-}
+  piece.addEventListener("dragend", () => {
+    draggedPiece = null;
+  });
 
+  cell.addEventListener("dragover", e => e.preventDefault());
+
+  cell.addEventListener("drop", () => {
+    if (!draggedPiece) return;
+
+    const fromCell = draggedPiece.parentElement;
+    if (fromCell === cell) return;
+
+    const targetPiece = cell.firstElementChild;
+
+    cell.appendChild(draggedPiece);
+    fromCell.appendChild(targetPiece);
+
+    checkWin();
+  });
+
+  cell.appendChild(piece);
+  board.appendChild(cell);
+});
+
+// проверка победы
 function checkWin() {
-  return pieces.every((v, i) => v === i);
-}
+  const cells = document.querySelectorAll(".cell");
+  let correct = 0;
 
-function showSuccess() {
-  gameScreen.classList.add('hidden');
-  successScreen.classList.remove('hidden');
-}
+  cells.forEach((cell, index) => {
+    const piece = cell.firstElementChild;
+    if (piece && Number(piece.dataset.correct) === index) {
+      correct++;
+    }
+  });
 
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+  if (correct === size * size) {
+    bonus.style.display = "block";
   }
 }
 
-function goToBooking() {
-  window.location.href = 'https://example.com';
-}
+// кнопка возврата
+document.getElementById("backToCatalog").onclick = () => {
+  const link = "https://t.me/svetliidom_booking_bot/realty";
+
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.openTelegramLink(link);
+  } else {
+    window.location.href = link;
+  }
+};
 </script>
+
+</body>
+</html>
