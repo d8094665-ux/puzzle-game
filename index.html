@@ -12,6 +12,7 @@ body {
   background: #1f1f1f;
   color: #fff;
   font-family: Arial, sans-serif;
+  user-select: none;
 }
 
 h1 {
@@ -29,7 +30,7 @@ h1 {
 
 .cell {
   width: 100%;
-  padding-top: 100%; /* 🔥 вместо aspect-ratio */
+  padding-top: 100%;
   position: relative;
   background: #2b2b2b;
   border-radius: 8px;
@@ -40,12 +41,19 @@ h1 {
   position: absolute;
   inset: 0;
   background-size: 300% 300%;
-  cursor: grab;
+  touch-action: none;
+}
+
+.dragging {
+  opacity: 0.8;
+  transform: scale(1.05);
+  z-index: 1000;
 }
 
 #bonus {
   display: none;
   text-align: center;
+  margin-top: 20px;
 }
 
 button {
@@ -74,7 +82,7 @@ button {
 
 <div id="bonus">
   <h2>🎉 Отлично!</h2>
-  <p>Вы собрали квартиру и получили бонус</p>
+  <p id="bonusText">Вы собрали квартиру и получили бонус</p>
   <button class="back-btn" id="backToCatalog">
     🏠 Вернуться к квартирам
   </button>
@@ -89,20 +97,23 @@ const images = [
 const size = 3;
 const board = document.getElementById("board");
 const bonus = document.getElementById("bonus");
-
+const bonusText = document.getElementById("bonusText");
 const image = images[Math.floor(Math.random() * images.length)];
-let draggedPiece = null;
 
+let activePiece = null;
+let startCell = null;
+
+// перемешанные позиции
 let positions = [...Array(size * size).keys()];
 positions.sort(() => Math.random() - 0.5);
 
-positions.forEach((correctPos, cellIndex) => {
+// создание поля
+positions.forEach((correctPos) => {
   const cell = document.createElement("div");
   cell.className = "cell";
 
   const piece = document.createElement("div");
   piece.className = "piece";
-  piece.draggable = true;
   piece.dataset.correct = correctPos;
 
   const x = correctPos % size;
@@ -111,27 +122,47 @@ positions.forEach((correctPos, cellIndex) => {
   piece.style.backgroundImage = `url('${image}')`;
   piece.style.backgroundPosition = `${x * -100}% ${y * -100}%`;
 
-  piece.addEventListener("dragstart", () => draggedPiece = piece);
-  piece.addEventListener("dragend", () => draggedPiece = null);
-
-  cell.addEventListener("dragover", e => e.preventDefault());
-
-  cell.addEventListener("drop", () => {
-    if (!draggedPiece) return;
-
-    const fromCell = draggedPiece.parentElement;
-    if (fromCell === cell) return;
-
-    const target = cell.firstElementChild;
-    cell.appendChild(draggedPiece);
-    fromCell.appendChild(target);
-
-    checkWin();
-  });
+  piece.addEventListener("pointerdown", startDrag);
 
   cell.appendChild(piece);
   board.appendChild(cell);
 });
+
+function startDrag(e) {
+  activePiece = e.target;
+  startCell = activePiece.parentElement;
+
+  activePiece.classList.add("dragging");
+
+  document.addEventListener("pointermove", moveDrag);
+  document.addEventListener("pointerup", endDrag);
+}
+
+function moveDrag(e) {
+  activePiece.style.transform =
+    `translate(${e.movementX}px, ${e.movementY}px) scale(1.05)`;
+}
+
+function endDrag(e) {
+  activePiece.classList.remove("dragging");
+  activePiece.style.transform = "";
+
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  const targetCell = target?.closest(".cell");
+
+  if (targetCell && targetCell !== startCell) {
+    const targetPiece = targetCell.firstElementChild;
+    targetCell.appendChild(activePiece);
+    startCell.appendChild(targetPiece);
+    checkWin();
+  }
+
+  document.removeEventListener("pointermove", moveDrag);
+  document.removeEventListener("pointerup", endDrag);
+
+  activePiece = null;
+  startCell = null;
+}
 
 function checkWin() {
   const cells = document.querySelectorAll(".cell");
@@ -145,10 +176,12 @@ function checkWin() {
   });
 
   if (correct === size * size) {
+    bonusText.textContent = "Вы собрали квартиру! Ваш промокод: SVETLI5 — скидка 5%";
     bonus.style.display = "block";
   }
 }
 
+// кнопка возврата
 document.getElementById("backToCatalog").onclick = () => {
   const link = "https://t.me/svetliidom_booking_bot/realty";
   if (window.Telegram && Telegram.WebApp) {
