@@ -91,37 +91,45 @@ const bonus = document.getElementById("bonus");
 const image = images[Math.floor(Math.random() * images.length)];
 let draggedPiece = null;
 
-// создаём массив позиций
+// массив правильных позиций
 let positions = [...Array(size * size).keys()];
 positions.sort(() => Math.random() - 0.5);
 
 // создаём поле
-positions.forEach((pos, index) => {
+positions.forEach((correctPos, cellIndex) => {
   const cell = document.createElement("div");
   cell.className = "cell";
-  cell.dataset.index = index;
+  cell.dataset.index = cellIndex;
 
   const piece = document.createElement("div");
   piece.className = "piece";
   piece.draggable = true;
-  piece.dataset.correct = pos;
 
-  const x = pos % size;
-  const y = Math.floor(pos / size);
+  piece.dataset.correct = correctPos;
+
+  const x = correctPos % size;
+  const y = Math.floor(correctPos / size);
 
   piece.style.backgroundImage = `url(${image})`;
   piece.style.backgroundPosition = `${x * -100}% ${y * -100}%`;
 
-  piece.addEventListener("dragstart", () => draggedPiece = piece);
-  piece.addEventListener("dragend", () => draggedPiece = null);
+  piece.addEventListener("dragstart", () => {
+    draggedPiece = piece;
+  });
+
+  piece.addEventListener("dragend", () => {
+    draggedPiece = null;
+  });
 
   cell.addEventListener("dragover", e => e.preventDefault());
 
   cell.addEventListener("drop", () => {
-    if (!draggedPiece || cell.firstChild === draggedPiece) return;
+    if (!draggedPiece) return;
 
-    const fromCell = draggedPiece.parentNode;
-    const targetPiece = cell.firstChild;
+    const fromCell = draggedPiece.parentElement;
+    if (fromCell === cell) return;
+
+    const targetPiece = cell.firstElementChild;
 
     cell.appendChild(draggedPiece);
     fromCell.appendChild(targetPiece);
@@ -139,7 +147,8 @@ function checkWin() {
   let correct = 0;
 
   cells.forEach((cell, index) => {
-    if (cell.firstChild.dataset.correct == index) {
+    const piece = cell.firstElementChild;
+    if (piece && Number(piece.dataset.correct) === index) {
       correct++;
     }
   });
@@ -151,13 +160,12 @@ function checkWin() {
 
 // кнопка возврата
 document.getElementById("backToCatalog").onclick = () => {
+  const link = "https://t.me/svetliidom_booking_bot/realty";
+
   if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.openTelegramLink(
-      "https://t.me/svetliidom_booking_bot/realty"
-    );
+    Telegram.WebApp.openTelegramLink(link);
   } else {
-    window.location.href =
-      "https://t.me/svetliidom_booking_bot/realty";
+    window.location.href = link;
   }
 };
 </script>
