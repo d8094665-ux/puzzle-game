@@ -2,242 +2,180 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Собери квартиру</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Собери квартиру</title>
 
 <style>
-* { box-sizing: border-box; }
-
 body {
   margin: 0;
-  background: #1e1e1e;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-  display: flex;
-  justify-content: center;
-}
-
-.app {
-  width: 100%;
-  max-width: 420px;
   padding: 16px;
-  text-align: center;
+  background: #1f1f1f;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
 }
 
 h1 {
-  font-size: 22px;
+  text-align: center;
+  font-size: 20px;
   margin-bottom: 10px;
 }
 
-p {
-  opacity: 0.85;
+#game {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #2e2e2e;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.piece {
+  width: 100%;
+  height: 100%;
+  background-size: 300% 300%;
+  cursor: grab;
+}
+
+#bonus {
+  display: none;
+  text-align: center;
+  margin-top: 20px;
 }
 
 button {
   width: 100%;
   padding: 14px;
-  margin-top: 14px;
-  background: #2f80ed;
-  border: none;
-  border-radius: 10px;
-  color: #fff;
   font-size: 16px;
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-.hidden {
-  display: none;
-}
-
-.preview {
-  width: 100%;
   border-radius: 12px;
+  border: none;
+  cursor: pointer;
   margin-top: 12px;
 }
 
-.puzzle {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  margin-top: 16px;
+.bonus-btn {
+  background: #00c853;
+  color: #fff;
 }
 
-.piece {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  background-size: 300% 300%;
-  border-radius: 4px;
-  touch-action: none;
-}
-
-.piece:active {
-  opacity: 0.7;
-}
-
-.success-box {
-  background: #2a2a2a;
-  padding: 20px;
-  border-radius: 14px;
-}
-
-.promo {
-  font-size: 20px;
-  font-weight: bold;
-  color: #27ae60;
-  margin: 10px 0;
+.back-btn {
+  background: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
 }
 </style>
 </head>
 
 <body>
-<div class="app">
+<div id="game">
+  <h1>🧩 Собери квартиру — получи бонус</h1>
 
-<!-- START -->
-<div id="startScreen">
-  <h1>🧩 Собери квартиру</h1>
-  <p>Собери пазл и получи бонус на бронирование</p>
-  <img id="preview" class="preview">
-  <button id="startBtn">Начать игру</button>
-</div>
+  <div id="board"></div>
 
-<!-- GAME -->
-<div id="gameScreen" class="hidden">
-  <h1>Перетащи элементы</h1>
-  <div class="puzzle" id="puzzle"></div>
-</div>
+  <div id="bonus">
+    <h2>🎉 Готово!</h2>
+    <p>Ваш бонус: <b>скидка или ранний заезд</b></p>
 
-<!-- SUCCESS -->
-<div id="successScreen" class="hidden">
-  <div class="success-box">
-    <h1>🎉 Готово!</h1>
-    <p>Твой бонус:</p>
-    <div class="promo">Скидка 5%</div>
-    <p>Промокод: <b>MOSCOW5</b></p>
-    <button onclick="goToBooking()">Забронировать</button>
+    <button class="bonus-btn" id="backToCatalog">
+      🏠 Вернуться к квартирам
+    </button>
   </div>
 </div>
 
-</div>
-
 <script>
-/* Telegram */
-if (window.Telegram?.WebApp) {
-  Telegram.WebApp.ready();
-  Telegram.WebApp.expand();
-}
-
-/* ===== НАСТРОЙКИ ===== */
-
-// массив предустановленных фото
-const presetImages = [
+// === НАСТРОЙКИ ===
+const images = [
   "images/apt1.jpg",
   "images/apt2.jpg",
-  "images/apt3.jpg",
-  "images/apt4.jpg"
+  "images/apt3.jpg"
 ];
 
-// ссылка бронирования
-const BOOKING_URL = "https://example.com";
+const size = 3;
+const board = document.getElementById("board");
+const bonus = document.getElementById("bonus");
 
-/* ===================== */
+const image = images[Math.floor(Math.random() * images.length)];
+let dragged = null;
+let placed = 0;
 
-const selectedImage =
-  presetImages[Math.floor(Math.random() * presetImages.length)];
+// === СОЗДАНИЕ ПАЗЛА ===
+const positions = [];
 
-document.getElementById("preview").src = selectedImage;
-
-const startScreen = document.getElementById("startScreen");
-const gameScreen = document.getElementById("gameScreen");
-const successScreen = document.getElementById("successScreen");
-const puzzleEl = document.getElementById("puzzle");
-
-let pieces = [];
-let draggedIndex = null;
-
-document.getElementById("startBtn").onclick = () => {
-  startScreen.classList.add("hidden");
-  gameScreen.classList.remove("hidden");
-  initPuzzle();
-};
-
-function initPuzzle() {
-  pieces = [...Array(9).keys()];
-  shuffle(pieces);
-  renderPuzzle();
+for (let i = 0; i < size * size; i++) {
+  positions.push(i);
 }
 
-function renderPuzzle() {
-  puzzleEl.innerHTML = "";
+positions.sort(() => Math.random() - 0.5);
 
-  pieces.forEach((pos, index) => {
-    const piece = document.createElement("div");
-    piece.className = "piece";
-    piece.dataset.index = index;
-    piece.dataset.current = pos;
+for (let i = 0; i < size * size; i++) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.dataset.index = i;
 
-    updateBG(piece);
+  cell.addEventListener("dragover", e => e.preventDefault());
 
-    piece.addEventListener("pointerdown", () => {
-      draggedIndex = index;
-    });
+  cell.addEventListener("drop", () => {
+    if (!dragged) return;
+    if (cell.firstChild) return;
 
-    piece.addEventListener("pointerup", e => {
-      const targetIndex = getIndexFromEvent(e);
-      if (targetIndex !== null && targetIndex !== draggedIndex) {
-        swap(draggedIndex, targetIndex);
-        renderPuzzle();
-        if (checkWin()) setTimeout(showSuccess, 300);
+    if (dragged.dataset.correct == cell.dataset.index) {
+      cell.appendChild(dragged);
+      dragged.draggable = false;
+      placed++;
+
+      if (placed === size * size) {
+        setTimeout(showBonus, 300);
       }
-      draggedIndex = null;
-    });
-
-    puzzleEl.appendChild(piece);
+    }
   });
+
+  board.appendChild(cell);
 }
 
-function updateBG(piece) {
-  const pos = piece.dataset.current;
-  piece.style.backgroundImage = `url(${selectedImage})`;
-  piece.style.backgroundPosition =
-    `${(pos % 3) * 50}% ${Math.floor(pos / 3) * 50}%`;
+positions.forEach(pos => {
+  const piece = document.createElement("div");
+  piece.className = "piece";
+  piece.draggable = true;
+  piece.dataset.correct = pos;
+
+  const x = pos % size;
+  const y = Math.floor(pos / size);
+
+  piece.style.backgroundImage = `url(${image})`;
+  piece.style.backgroundPosition = `${x * -100}% ${y * -100}%`;
+
+  piece.addEventListener("dragstart", () => dragged = piece);
+  piece.addEventListener("dragend", () => dragged = null);
+
+  board.appendChild(piece);
+});
+
+// === ПОКАЗ БОНУСА ===
+function showBonus() {
+  bonus.style.display = "block";
 }
 
-function getIndexFromEvent(e) {
-  const rect = puzzleEl.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
-  const col = Math.floor(x / (rect.width / 3));
-  const row = Math.floor(y / (rect.height / 3));
-  return row * 3 + col;
-}
-
-function swap(a, b) {
-  [pieces[a], pieces[b]] = [pieces[b], pieces[a]];
-}
-
-function checkWin() {
-  return pieces.every((v, i) => v === i);
-}
-
-function showSuccess() {
-  gameScreen.classList.add("hidden");
-  successScreen.classList.remove("hidden");
-}
-
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+// === КНОПКА В КАТАЛОГ ===
+document.getElementById("backToCatalog").onclick = function () {
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.openTelegramLink(
+      "https://t.me/svetliidom_booking_bot/realty"
+    );
+  } else {
+    window.location.href =
+      "https://t.me/svetliidom_booking_bot/realty";
   }
-}
-
-function goToBooking() {
-  window.location.href = BOOKING_URL;
-}
+};
 </script>
 </body>
 </html>
