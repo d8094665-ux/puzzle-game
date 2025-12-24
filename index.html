@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Собери квартиру</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: #f4f6f8;
-      color: #222;
       display: flex;
       justify-content: center;
     }
@@ -28,24 +27,17 @@
     }
 
     button {
-      padding: 14px 20px;
-      font-size: 16px;
+      padding: 14px;
+      width: 100%;
       border: none;
       border-radius: 10px;
       background: #2f80ed;
       color: #fff;
-      cursor: pointer;
+      font-size: 16px;
       margin-top: 12px;
-      width: 100%;
     }
 
-    button:disabled {
-      background: #aaa;
-    }
-
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     input[type="file"] {
       margin-top: 12px;
@@ -56,13 +48,24 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 2px;
       margin-top: 15px;
+      position: relative;
     }
 
     .piece {
       width: 100%;
       aspect-ratio: 1 / 1;
       background-size: 300% 300%;
-      cursor: pointer;
+      border-radius: 4px;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .piece.dragging {
+      position: absolute;
+      z-index: 10;
+      cursor: grabbing;
+      opacity: 0.9;
+      transform: scale(1.05);
     }
 
     .success {
@@ -73,157 +76,169 @@
 
     .promo {
       font-size: 20px;
+      color: #27ae60;
       font-weight: bold;
       margin: 10px 0;
-      color: #27ae60;
     }
   </style>
 </head>
 
 <body>
-  <div class="app">
+<div class="app">
 
-    <!-- START SCREEN -->
-    <div id="startScreen">
-      <h1>🧩 Собери квартиру</h1>
-      <p>Загрузи фото апартаментов и собери пазл, чтобы получить бонус</p>
-
-      <!-- Загрузка фото квартиры -->
-      <input type="file" id="imageInput" accept="image/*" />
-
-      <button id="startBtn" disabled>Начать игру</button>
-    </div>
-
-    <!-- GAME SCREEN -->
-    <div id="gameScreen" class="hidden">
-      <h1>Собери изображение</h1>
-      <div class="puzzle" id="puzzle"></div>
-    </div>
-
-    <!-- SUCCESS SCREEN -->
-    <div id="successScreen" class="hidden">
-      <div class="success">
-        <h1>🎉 Готово!</h1>
-        <p>Ты собрал квартиру и получаешь:</p>
-        <div class="promo">Скидка 5%</div>
-        <p>Промокод: <b>MOSCOW5</b></p>
-
-        <button onclick="goToBooking()">Забронировать квартиру</button>
-      </div>
-    </div>
-
+  <!-- START -->
+  <div id="startScreen">
+    <h1>🧩 Собери квартиру</h1>
+    <p>Загрузи фото апартаментов и собери пазл</p>
+    <input type="file" id="imageInput" accept="image/*">
+    <button id="startBtn" disabled>Начать игру</button>
   </div>
 
-  <script>
-    // Telegram Mini App init
-    if (window.Telegram && Telegram.WebApp) {
-      Telegram.WebApp.ready();
-      Telegram.WebApp.expand();
-    }
+  <!-- GAME -->
+  <div id="gameScreen" class="hidden">
+    <h1>Перетащи элементы</h1>
+    <div class="puzzle" id="puzzle"></div>
+  </div>
 
-    const imageInput = document.getElementById("imageInput");
-    const startBtn = document.getElementById("startBtn");
-    const puzzleEl = document.getElementById("puzzle");
+  <!-- SUCCESS -->
+  <div id="successScreen" class="hidden">
+    <div class="success">
+      <h1>🎉 Готово!</h1>
+      <p>Ты получаешь:</p>
+      <div class="promo">Скидка 5%</div>
+      <p>Промокод: <b>MOSCOW5</b></p>
+      <button onclick="goToBooking()">Забронировать</button>
+    </div>
+  </div>
 
-    const startScreen = document.getElementById("startScreen");
-    const gameScreen = document.getElementById("gameScreen");
-    const successScreen = document.getElementById("successScreen");
+</div>
 
-    let pieces = [];
-    let selected = null;
+<script>
+if (window.Telegram?.WebApp) {
+  Telegram.WebApp.ready();
+  Telegram.WebApp.expand();
+}
 
-    imageInput.addEventListener("change", () => {
-      startBtn.disabled = !imageInput.files.length;
+const imageInput = document.getElementById('imageInput');
+const startBtn = document.getElementById('startBtn');
+const puzzleEl = document.getElementById('puzzle');
+
+const startScreen = document.getElementById('startScreen');
+const gameScreen = document.getElementById('gameScreen');
+const successScreen = document.getElementById('successScreen');
+
+let draggedPiece = null;
+let startX = 0;
+let startY = 0;
+
+imageInput.onchange = () => startBtn.disabled = !imageInput.files.length;
+
+startBtn.onclick = () => {
+  startScreen.classList.add('hidden');
+  gameScreen.classList.remove('hidden');
+  initPuzzle();
+};
+
+function initPuzzle() {
+  const img = new Image();
+  img.src = URL.createObjectURL(imageInput.files[0]);
+
+  img.onload = () => {
+    puzzleEl.innerHTML = '';
+    const order = [...Array(9).keys()];
+    shuffle(order);
+
+    order.forEach((pos, index) => {
+      const piece = document.createElement('div');
+      piece.className = 'piece';
+      piece.dataset.correct = index;
+      piece.dataset.current = pos;
+
+      const x = pos % 3;
+      const y = Math.floor(pos / 3);
+
+      piece.style.backgroundImage = `url(${img.src})`;
+      piece.style.backgroundPosition = `${x * 50}% ${y * 50}%`;
+
+      piece.addEventListener('pointerdown', onDragStart);
+      puzzleEl.appendChild(piece);
     });
+  };
+}
 
-    startBtn.addEventListener("click", () => {
-      startScreen.classList.add("hidden");
-      gameScreen.classList.remove("hidden");
-      createPuzzle();
-    });
+function onDragStart(e) {
+  draggedPiece = e.target;
+  draggedPiece.setPointerCapture(e.pointerId);
 
-    function createPuzzle() {
-      const img = new Image();
-      img.src = URL.createObjectURL(imageInput.files[0]);
+  const rect = draggedPiece.getBoundingClientRect();
+  startX = e.clientX - rect.left;
+  startY = e.clientY - rect.top;
 
-      img.onload = () => {
-        pieces = [];
-        puzzleEl.innerHTML = "";
+  draggedPiece.classList.add('dragging');
+  draggedPiece.style.width = rect.width + 'px';
+  draggedPiece.style.height = rect.height + 'px';
+}
 
-        for (let i = 0; i < 9; i++) {
-          pieces.push(i);
-        }
+document.addEventListener('pointermove', e => {
+  if (!draggedPiece) return;
 
-        shuffleArray(pieces);
+  draggedPiece.style.left = (e.clientX - startX - puzzleEl.getBoundingClientRect().left) + 'px';
+  draggedPiece.style.top = (e.clientY - startY - puzzleEl.getBoundingClientRect().top) + 'px';
+});
 
-        pieces.forEach((pos, index) => {
-          const div = document.createElement("div");
-          div.className = "piece";
-          div.dataset.correct = index;
-          div.dataset.current = pos;
+document.addEventListener('pointerup', e => {
+  if (!draggedPiece) return;
 
-          const x = pos % 3;
-          const y = Math.floor(pos / 3);
+  draggedPiece.classList.remove('dragging');
+  draggedPiece.style.left = '';
+  draggedPiece.style.top = '';
+  draggedPiece.style.width = '';
+  draggedPiece.style.height = '';
 
-          div.style.backgroundImage = `url(${img.src})`;
-          div.style.backgroundPosition = `${x * 50}% ${y * 50}%`;
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  if (target && target.classList.contains('piece') && target !== draggedPiece) {
+    swap(draggedPiece, target);
+    if (checkWin()) setTimeout(showSuccess, 300);
+  }
 
-          div.addEventListener("click", () => selectPiece(div));
-          puzzleEl.appendChild(div);
-        });
-      };
-    }
+  draggedPiece = null;
+});
 
-    function selectPiece(piece) {
-      if (!selected) {
-        selected = piece;
-        piece.style.opacity = "0.6";
-      } else {
-        swapPieces(selected, piece);
-        selected.style.opacity = "1";
-        selected = null;
+function swap(a, b) {
+  const temp = a.dataset.current;
+  a.dataset.current = b.dataset.current;
+  b.dataset.current = temp;
 
-        if (checkWin()) {
-          setTimeout(showSuccess, 300);
-        }
-      }
-    }
+  updateBG(a);
+  updateBG(b);
+}
 
-    function swapPieces(a, b) {
-      const temp = a.dataset.current;
-      a.dataset.current = b.dataset.current;
-      b.dataset.current = temp;
+function updateBG(piece) {
+  const pos = piece.dataset.current;
+  piece.style.backgroundPosition =
+    `${(pos % 3) * 50}% ${Math.floor(pos / 3) * 50}%`;
+}
 
-      const ax = a.dataset.current % 3;
-      const ay = Math.floor(a.dataset.current / 3);
-      const bx = b.dataset.current % 3;
-      const by = Math.floor(b.dataset.current / 3);
+function checkWin() {
+  return [...document.querySelectorAll('.piece')]
+    .every(p => p.dataset.correct === p.dataset.current);
+}
 
-      a.style.backgroundPosition = `${ax * 50}% ${ay * 50}%`;
-      b.style.backgroundPosition = `${bx * 50}% ${by * 50}%`;
-    }
+function showSuccess() {
+  gameScreen.classList.add('hidden');
+  successScreen.classList.remove('hidden');
+}
 
-    function checkWin() {
-      return [...document.querySelectorAll(".piece")]
-        .every(p => p.dataset.correct === p.dataset.current);
-    }
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
 
-    function showSuccess() {
-      gameScreen.classList.add("hidden");
-      successScreen.classList.remove("hidden");
-    }
-
-    function shuffleArray(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    }
-
-    function goToBooking() {
-      // Заменить на реальную страницу бронирования
-      window.location.href = "https://example.com";
-    }
-  </script>
+function goToBooking() {
+  window.location.href = 'https://example.com';
+}
+</script>
 </body>
 </html>
