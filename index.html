@@ -45,7 +45,7 @@ h1 {
 }
 
 .dragging {
-  opacity: 0.8;
+  opacity: 0.85;
   transform: scale(1.05);
   z-index: 1000;
 }
@@ -82,32 +82,38 @@ button {
 
 <div id="bonus">
   <h2>🎉 Отлично!</h2>
-  <p id="bonusText">Вы собрали квартиру и получили бонус</p>
+  <p id="bonusText"></p>
   <button class="back-btn" id="backToCatalog">
     🏠 Вернуться к квартирам
   </button>
 </div>
 
 <script>
+// ================= НАСТРОЙКИ =================
 const images = [
   "./images/apt1.jpg",
   "./images/apt2.jpg"
 ];
 
+const PROMO_CODE = "SVETLI5";
+const CATALOG_URL = "https://svetliidom.ru/booking-miniapp";
 const size = 3;
+// ============================================
+
 const board = document.getElementById("board");
 const bonus = document.getElementById("bonus");
 const bonusText = document.getElementById("bonusText");
+
 const image = images[Math.floor(Math.random() * images.length)];
 
 let activePiece = null;
 let startCell = null;
 
-// перемешанные позиции
+// перемешиваем позиции
 let positions = [...Array(size * size).keys()];
 positions.sort(() => Math.random() - 0.5);
 
-// создание поля
+// создаём поле
 positions.forEach((correctPos) => {
   const cell = document.createElement("div");
   cell.className = "cell";
@@ -128,6 +134,7 @@ positions.forEach((correctPos) => {
   board.appendChild(cell);
 });
 
+// ================= DRAG =================
 function startDrag(e) {
   activePiece = e.target;
   startCell = activePiece.parentElement;
@@ -164,6 +171,7 @@ function endDrag(e) {
   startCell = null;
 }
 
+// ================= ПРОВЕРКА ПОБЕДЫ =================
 function checkWin() {
   const cells = document.querySelectorAll(".cell");
   let correct = 0;
@@ -176,18 +184,20 @@ function checkWin() {
   });
 
   if (correct === size * size) {
-    bonusText.textContent = "Вы собрали квартиру! Ваш промокод: SVETLI5 — скидка 5%";
+    bonusText.textContent =
+      `Вы собрали квартиру! Ваш промокод: ${PROMO_CODE} — скидка 5%`;
     bonus.style.display = "block";
   }
 }
 
-// кнопка возврата
+// ================= КНОПКА ВОЗВРАТА =================
 document.getElementById("backToCatalog").onclick = () => {
-  const link = "https://t.me/svetliidom_booking_bot/realty";
   if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.openTelegramLink(link);
+    Telegram.WebApp.openLink(CATALOG_URL, {
+      try_instant_view: false
+    });
   } else {
-    location.href = link;
+    window.location.href = CATALOG_URL;
   }
 };
 </script>
