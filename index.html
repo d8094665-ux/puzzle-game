@@ -10,32 +10,26 @@ body {
   margin: 0;
   padding: 16px;
   background: #1f1f1f;
-  color: #ffffff;
+  color: #fff;
   font-family: Arial, sans-serif;
 }
 
 h1 {
   text-align: center;
   font-size: 20px;
-  margin-bottom: 10px;
-}
-
-#game {
-  max-width: 360px;
-  margin: 0 auto;
 }
 
 #board {
+  max-width: 360px;
+  margin: 20px auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
-  margin-top: 12px;
 }
 
 .cell {
-  width: 100%;
   aspect-ratio: 1 / 1;
-  background: #2e2e2e;
+  background: #2b2b2b;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -50,7 +44,6 @@ h1 {
 #bonus {
   display: none;
   text-align: center;
-  margin-top: 20px;
 }
 
 button {
@@ -63,11 +56,6 @@ button {
   margin-top: 12px;
 }
 
-.bonus-btn {
-  background: #00c853;
-  color: #fff;
-}
-
 .back-btn {
   background: #2b2b2b;
   color: #fff;
@@ -77,27 +65,23 @@ button {
 </head>
 
 <body>
-<div id="game">
-  <h1>🧩 Собери квартиру — получи бонус</h1>
 
-  <div id="board"></div>
+<h1>🧩 Собери квартиру — получи бонус</h1>
 
-  <div id="bonus">
-    <h2>🎉 Готово!</h2>
-    <p>Ваш бонус: <b>скидка или ранний заезд</b></p>
+<div id="board"></div>
 
-    <button class="bonus-btn" id="backToCatalog">
-      🏠 Вернуться к квартирам
-    </button>
-  </div>
+<div id="bonus">
+  <h2>🎉 Отлично!</h2>
+  <p>Вы собрали квартиру и получили бонус</p>
+  <button class="back-btn" id="backToCatalog">
+    🏠 Вернуться к квартирам
+  </button>
 </div>
 
 <script>
-// === НАСТРОЙКИ ===
 const images = [
   "images/apt1.jpg",
-  "images/apt2.jpg",
-  "images/apt3.jpg"
+  "images/apt2.jpg"
 ];
 
 const size = 3;
@@ -105,44 +89,18 @@ const board = document.getElementById("board");
 const bonus = document.getElementById("bonus");
 
 const image = images[Math.floor(Math.random() * images.length)];
-let dragged = null;
-let placed = 0;
+let draggedPiece = null;
 
-// === СОЗДАНИЕ ПАЗЛА ===
-const positions = [];
-
-for (let i = 0; i < size * size; i++) {
-  positions.push(i);
-}
-
+// создаём массив позиций
+let positions = [...Array(size * size).keys()];
 positions.sort(() => Math.random() - 0.5);
 
-for (let i = 0; i < size * size; i++) {
+// создаём поле
+positions.forEach((pos, index) => {
   const cell = document.createElement("div");
   cell.className = "cell";
-  cell.dataset.index = i;
+  cell.dataset.index = index;
 
-  cell.addEventListener("dragover", e => e.preventDefault());
-
-  cell.addEventListener("drop", () => {
-    if (!dragged) return;
-    if (cell.firstChild) return;
-
-    if (dragged.dataset.correct == cell.dataset.index) {
-      cell.appendChild(dragged);
-      dragged.draggable = false;
-      placed++;
-
-      if (placed === size * size) {
-        setTimeout(showBonus, 300);
-      }
-    }
-  });
-
-  board.appendChild(cell);
-}
-
-positions.forEach(pos => {
   const piece = document.createElement("div");
   piece.className = "piece";
   piece.draggable = true;
@@ -154,19 +112,45 @@ positions.forEach(pos => {
   piece.style.backgroundImage = `url(${image})`;
   piece.style.backgroundPosition = `${x * -100}% ${y * -100}%`;
 
-  piece.addEventListener("dragstart", () => dragged = piece);
-  piece.addEventListener("dragend", () => dragged = null);
+  piece.addEventListener("dragstart", () => draggedPiece = piece);
+  piece.addEventListener("dragend", () => draggedPiece = null);
 
-  board.appendChild(piece);
+  cell.addEventListener("dragover", e => e.preventDefault());
+
+  cell.addEventListener("drop", () => {
+    if (!draggedPiece || cell.firstChild === draggedPiece) return;
+
+    const fromCell = draggedPiece.parentNode;
+    const targetPiece = cell.firstChild;
+
+    cell.appendChild(draggedPiece);
+    fromCell.appendChild(targetPiece);
+
+    checkWin();
+  });
+
+  cell.appendChild(piece);
+  board.appendChild(cell);
 });
 
-// === ПОКАЗ БОНУСА ===
-function showBonus() {
-  bonus.style.display = "block";
+// проверка победы
+function checkWin() {
+  const cells = document.querySelectorAll(".cell");
+  let correct = 0;
+
+  cells.forEach((cell, index) => {
+    if (cell.firstChild.dataset.correct == index) {
+      correct++;
+    }
+  });
+
+  if (correct === size * size) {
+    bonus.style.display = "block";
+  }
 }
 
-// === КНОПКА В КАТАЛОГ ===
-document.getElementById("backToCatalog").onclick = function () {
+// кнопка возврата
+document.getElementById("backToCatalog").onclick = () => {
   if (window.Telegram && Telegram.WebApp) {
     Telegram.WebApp.openTelegramLink(
       "https://t.me/svetliidom_booking_bot/realty"
@@ -177,5 +161,6 @@ document.getElementById("backToCatalog").onclick = function () {
   }
 };
 </script>
+
 </body>
 </html>
